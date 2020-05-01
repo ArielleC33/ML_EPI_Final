@@ -2,7 +2,9 @@
 title: "Final"
 author: "Arielle"
 date: "05/01/2020"
-output: html_document
+output:
+  word_document: default
+  html_document: default
 ---
 
 ```{r setup, include=FALSE}
@@ -133,7 +135,8 @@ plot(hc3, cex = 0.6, hang = -1)
 
 ###Question 2: Describe the outputs of the analysis in terms of their composition of the input features.
 
-The optimal number of cluster based on the k means clustering plot are eight cluster, this is inconsistent with the optimal number of cluster based on hierarchical clustering. For this type of clustering, the gap statistic stated that five was the optimal number of cluster to have. Five clusters was consistent acroos the different types of linkage methods, single, complete and average. Although the cluster dendrograms all look different the results from all of them are the same. 
+The optimal number of cluster based on the k means clustering plot are 2 cluster, this consistent with the optimal number of cluster based on hierarchical clustering. For this type of clustering, the gap statistic stated that two was also the optimal number of cluster to have. Two clusters was consistent across the different types of linkage methods, single, complete and average. Although the cluster dendrograms all look different the results from all of them are the same. 
+
 
 The means for perecnt of low income and percentage of housing stock built before 1960 are similar across all the linkaage methods. The  means observed were similar to each other, there was a little more  varaition in the means but not a huge varaition for air concentration of diesal extract and proximity to hazardous waste sites. 
 
@@ -182,10 +185,10 @@ REGULARIZED REGRESSION USING LASSO
 #LASSO
 model.2.1<-glmnet(x.train, glucose.train, alpha=1, standardize = TRUE)
 
-plot(model.1.1, xvar="lambda", label=TRUE)
-plot(model.1.1, xvar="dev", label=TRUE)
+plot(model.2.1, xvar="lambda", label=TRUE)
+plot(model.2.1, xvar="dev", label=TRUE)
 
-model.1.1$beta[,1]
+model.2.1$beta[,1]
 model.1.cv<-cv.glmnet(x.train, glucose.train, alpha=1)
 plot(model.1.cv)
 
