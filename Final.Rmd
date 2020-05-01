@@ -1,0 +1,266 @@
+---
+title: "Final"
+author: "Arielle"
+date: "05/01/2020"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(caret)
+library(glmnet)
+library (viridis)
+library(Amelia)
+library(devtools)
+library(rpart)
+library(rpart.plot)
+library(pROC)
+library(e1071)
+library(dplyr)
+library(randomForest)
+library(gbm)
+library(stats)
+library(factoextra)
+library(cluster)
+library(modelr)
+library(mgcv)
+knitr::opts_chunk$set(
+	echo = TRUE,
+	warning = FALSE,
+	fig.width = 8, 
+  fig.height = 6,
+  out.width = "90%"
+)
+options(
+  ggplot2.continuous.colour = "viridis",
+  ggplot2.continuous.fill = "viridis"
+)
+scale_colour_discrete = scale_colour_viridis_d
+scale_fill_discrete = scale_fill_viridis_d
+theme_set(theme_minimal() + theme(legend.position = "bottom"))
+```
+
+#Part 1: Neighborhood environments in New York City
+
+###Question 1: Run an appropriate unsupervised learning analysis that will address the above research question. Your analysis should include a data-driven approach to determine the optimal number of outputs that are retained/produced by the chosen learning technique.
+
+First, I read in the nyc environment dataset and removed any of the NAs in the dataset (there were no missing data in this data set). I then checked if scaling was needed by looking at the means and standard devations. Some of the means and standard devations are different from each other which makes it necesarry to scale the data.
+
+```{r}
+nyc.env<-read.csv("nyc_env_correct.csv", header=TRUE)
+
+nyc.env.nomiss<-na.omit(nyc.env)
+
+#Check means and SDs to determine if scaling is necessary
+colMeans(nyc.env, na.rm=TRUE)
+apply(nyc.env, 2, sd, na.rm=TRUE)
+
+nyc.env.scale = 
+  scale(nyc.env)
+```
+
+A clustering analysis was done next using k-means clustering to assess if there are any clusters in the data and where they are. The gap statistic determined that 8 clusters were needed for this data and that was entered to the final cluster model.
+
+```{r}
+set.seed(100)
+clusters<-kmeans(nyc.env.scale, 4, nstart=25)
+str(clusters)
+clusters
+fviz_cluster(clusters, data=nyc.env.scale)
+
+#Conduct a gap_statistic analysis to determine optimal number of clusters
+gap_stat<-clusGap(nyc.env.scale, FUN=kmeans, nstart=25, K.max=9, B=50)
+print(gap_stat, method="firstmax")
+
+clusters.1<-kmeans(nyc.env.scale, 2, nstart=25)
+str(clusters.1)
+clusters.1
+fviz_cluster(clusters.1, data=nyc.env.scale)
+```
+
+The next thing that I did was Hierarichical clustering setting the distance Euclidian methods since the data was all continuous and numeric. A dissimilarity  matrix was used to get the distance and looked at the difference clustering methods: Complete, Single, and average A gap statistic was also used to get the optimal number of clusters. 
+
+```{r}
+set.seed(100)
+
+# Create Dissimilarity matrix
+diss.matrix <- dist(nyc.env.scale, method = "euclidean")
+
+gap_stat <- clusGap(nyc.env.scale, FUN = hcut, nstart = 25, K.max = 10, B = 50, mc_metric = "euclidean")
+fviz_gap_stat(gap_stat)
+
+# Hierarchical clustering using Single Linkage
+gap_stat1 <- clusGap(nyc.env.scale, FUN = hcut, nstart = 25, K.max = 10, B = 50, mc_metric = "euclidean", method = "single")
+fviz_gap_stat(gap_stat1)
+
+# Create Dissimilarity matrix
+diss.matrix <- dist(nyc.env.scale, method = "euclidean")
+
+hc1 <- hclust(diss.matrix, method = "single" )
+
+groups.1<-cutree(hc1,4)
+aggregate(nyc.env.scale,list(groups.1),mean)
+
+# Plot the obtained dendrogram using Single
+plot(hc1, cex = 0.6, hang = -1)
+
+# Hierarchical clustering using Complete Linkage
+
+gap_stat2 <- clusGap(nyc.env.scale, FUN = hcut, nstart = 25, K.max = 10, B = 50, mc_metric = "euclidean", method = "complete")
+fviz_gap_stat(gap_stat2)
+
+hc2 <- hclust(diss.matrix, method = "complete" )
+
+groups.2 <-cutree(hc2,4)
+aggregate(nyc.env.scale,list(groups.2),mean)
+
+# Plot the obtained dendrogram using Complete
+plot(hc2, cex = 0.6, hang = -1)
+
+# Hierarchical clustering using Average Linkage
+gap_stat3 <- clusGap(nyc.env.scale, FUN = hcut, nstart = 25, K.max = 10, B = 50, mc_metric = "euclidean", method = "average")
+fviz_gap_stat(gap_stat3)
+
+hc3 <- hclust(diss.matrix, method = "average" )
+
+groups.3<-cutree(hc3,4)
+aggregate(nyc.env.scale,list(groups.3),mean)
+
+# Plot the obtained dendrogram using Average
+plot(hc3, cex = 0.6, hang = -1)
+```
+
+###Question 2: Describe the outputs of the analysis in terms of their composition of the input features.
+
+The optimal number of cluster based on the k means clustering plot are eight cluster, this is inconsistent with the optimal number of cluster based on hierarchical clustering. For this type of clustering, the gap statistic stated that five was the optimal number of cluster to have. Five clusters was consistent acroos the different types of linkage methods, single, complete and average. Although the cluster dendrograms all look different the results from all of them are the same. 
+
+The means for perecnt of low income and percentage of housing stock built before 1960 are similar across all the linkaage methods. The  means observed were similar to each other, there was a little more  varaition in the means but not a huge varaition for air concentration of diesal extract and proximity to hazardous waste sites. 
+
+###Question 3: List a subsequent research question that could be addressed using the output of this analysis. The output can be used as an exposure, outcome or confounding variable. State what type of research question it is: descriptive, explanatory or predictive.
+
+A subsequential research question that can be addressed using the outbut of this analysis is a explanatory question which is if a proportion of housing stocking built before 1960 as a proxy for potential lead exposure is associated with increase ambient air concentrations of diesel exhaust, while controling for proportion of neighborhood with household income lwoer than the city median. 
+
+#Part 2: Choose your own supervised adventure
+
+###B) Researchers are interested in uncovering nutritional factors that influence the development of diabetes. To generate hypotheses to guide future research, they ask you to utilize feature selection methods to identify the factors that are most relevant to fasting blood glucose. (The dataset you are given is glucose.csv.) You should try two different algorithms for feature selection and comment if they identify the same set of variables as being important for serum glucose.
+
+The first thing that will be done is import and clean the data. 
+
+```{r}
+glucose.raw<-read.csv("glucose.csv", header=TRUE)
+
+glucose =
+  glucose.raw %>%  
+  drop_na() %>% 
+  janitor::clean_names()
+```
+
+Next I will partition the data so that there is a 70/30 split and set the seed to 100. 
+
+```{r}
+set.seed(100)
+training.data.glucose<-glucose$lbxsgl %>% createDataPartition(p=0.7, list=F)
+train.data.glucose<-glucose[training.data.glucose, ]
+test.data.glucose<-glucose[-training.data.glucose, ]
+
+#Store outcome 
+glucose.train<-train.data.glucose$lbxsgl
+glucose.test<-test.data.glucose$lbxsgl
+
+# Store the outcome in one train and test and the predictors in another 
+#model matrix- will create indicator variables for categorical varaibles, it does not do anything to the continuous variables
+x.train<-model.matrix(lbxsgl~., train.data.glucose)[,-1]
+x.test<-model.matrix(lbxsgl~., test.data.glucose)[,-1]
+```
+
+I first performed a regulaized regression using LASSO and Elastic net. First I performed a model with LASSO setting my alpha to one, by doing this it shrinks the features in the model to 0 only leaving the ones that were most important for the model. The second regularized regression that I did was Elastic net, this is done by setting the alpha to 0.5. 
+
+
+REGULARIZED REGRESSION USING LASSO 
+```{r}
+#LASSO
+model.2.1<-glmnet(x.train, glucose.train, alpha=1, standardize = TRUE)
+
+plot(model.1.1, xvar="lambda", label=TRUE)
+plot(model.1.1, xvar="dev", label=TRUE)
+
+model.1.1$beta[,1]
+model.1.cv<-cv.glmnet(x.train, glucose.train, alpha=1)
+plot(model.1.cv)
+
+model.1.cv$lambda.min
+model.1.cv$lambda.1se
+
+model.1.train.final<-glmnet(x.train, glucose.train, alpha=1, lambda=model.1.cv$lambda.min)
+coef(model.1.train.final)
+
+model.1.test.pred<-model.1.train.final %>% predict(x.test) %>% as.vector()
+data.frame(RMSE=RMSE(model.1.test.pred, glucose.test), RSQ=R2(model.1.test.pred, glucose.test))
+
+```
+
+REGULARIZED REGRESSION USING ELASTIC NET
+
+```{r}
+#Elastic Net
+model.2.2<-glmnet(x.train, glucose.train, alpha=0.5, standardize = TRUE)
+
+plot(model.2.2, xvar="lambda", label=TRUE)
+
+model.2.2$beta[,1]
+model.2.cv<-cv.glmnet(x.train, glucose.train, alpha=0.5)
+plot(model.2.cv)
+
+model.2.cv$lambda.min
+model.2.cv$lambda.1se
+
+model.2.train.final<-glmnet(x.train, glucose.train, alpha=0.5, lambda=model.1.cv$lambda.min)
+coef(model.2.train.final)
+
+model.2.test.pred<-model.2.train.final %>% predict(x.test) %>% as.vector()
+data.frame(RMSE=RMSE(model.2.test.pred, glucose.test), RSQ=R2(model.2.test.pred, glucose.test))
+```
+
+I then fitted a support vector model to compare to the other two models to see which model performed the best. The support vector machine used the largest cost of 100 that shows there is a lot of misclassiofcation in in this model. 
+
+```{r}
+set.seed (100)
+svm.glucose<-svm(lbxsgl ~ ., data=train.data.glucose, kernel="linear", cost=1, scale=TRUE)
+print(svm.glucose)
+
+svm.pred<-predict(svm.glucose, newdata=train.data.glucose)
+
+rmse(svm.glucose, test.data.glucose)
+
+features<-x.train
+outcome<-train.data.glucose$lbxsgl
+
+svm_tune <- tune(svm, train.x=features, train.y=outcome,  kernel="linear", range=list(cost=10^(-1:2)))
+
+summary(svm_tune)
+
+svm.glucose.new<-svm(lbxsgl ~ ., data=train.data.glucose, kernel="linear", cost= 100, scale=TRUE)
+
+print(svm.glucose.new)
+
+svm.pred.new<-predict(svm.glucose.new, newdata=test.data.glucose)
+
+rmse(svm.glucose.new, test.data.glucose)
+```
+
+Based on these three alogorithms root mean square errors I would say that the best model to go with to further this analysis would be the LASSO regularized regression because it gave the smallest root mean squared error. 
+
+#Part 3: Ethical considerations of data-driven analyses in social epidemiology
+
+The following is an excerpt from an article on the ethical tensions in using social media data to characterize individuals’ and communities’ mental health. After reading the brief excerpt, address both questions listed below. The response (to both questions) should be limited to one page.
+
+“Powered by machine learning techniques, social media provides an unobtrusive lens into individual behaviors,emotions, and psychological states. Recent research has successfully employed social media data to predictmental health states of individuals, ranging from the presence and severity of mental disorders like depression to the risk of suicide. These algorithmic inferences hold great potential in supporting early detection and treatment of mental disorders and in the design of interventions. At the same time, the outcomes of this research can pose great risk...”
+
+###Question 1: Describe one potential risk to either individuals, communities or specific populations that could arise from research or public health practice that utilizes data-driven analyses of social-media data.
+
+One potential risk for individuals who use social media that could arise from using research or public health practices that utilizes data-driven ananlyses of social media data would be a violations of privacy. People who use social media and use the platforms that are being used ti run theses algorithms should be aware of what is happening. Although using social media could be beneficial to creating algorithms it could also be harmful if the data is not properly stored. If there are multiple platforms that an individual is using and those data are merged together to form a full data set then data that was once de-indentified might become identifiable if the the researchers are not careful. Every individual has a right to their privacy and by using social media to run data driven analysis could be a potential breach to the individual and put them at a higher risk. 
+
+###Question 2: Describe one potential safeguard that could be implemented to prevent the risk you describe.
+
+One safegaurd that could be implemented to protect individuals right to privacy is by setting guiedliens with HIPPA. If guidleiens are in place then it would be a way to protect the individuals right to privacy. There would have to be a system that regulates a way to ensure that the data remains de-identifiable. The patients' privacy should be one of the first concerns that researchers should be thinking about when dealing with big data from social media sources. HIPPA could set these guidelines across the board and ensure privacy for everyone while also getting information to make these predictions.  
